@@ -12,13 +12,16 @@ const App: React.FC = () => {
   const [isReviewMode, setIsReviewMode] = useState(false);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
 
-  // Wagmi hooks for minimal wallet connection
+  // Wagmi hooks with defensive defaults
   const account = useAccount();
-  const { connectors, connect } = useConnect();
-  const { disconnect } = useDisconnect();
+  const connectResult = useConnect();
+  const disconnectResult = useDisconnect();
 
   const isConnected = account?.isConnected ?? false;
   const address = account?.address ?? null;
+  const connectors = connectResult?.connectors ?? [];
+  const connect = connectResult?.connect;
+  const disconnect = disconnectResult?.disconnect;
 
   // Persistence logic
   useEffect(() => {
@@ -36,7 +39,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (entries) {
+    if (entries && entries.length > 0) {
       localStorage.setItem('decision_journal_entries', JSON.stringify(entries));
     }
   }, [entries]);
@@ -45,7 +48,9 @@ const App: React.FC = () => {
     console.log("connect clicked");
     if (typeof window !== 'undefined' && (window as any).ethereum) {
       if (connect && connectors && connectors.length > 0) {
-        connect({ connector: connectors[0] });
+        // Find injected connector specifically
+        const injected = connectors.find(c => c.type === 'injected') || connectors[0];
+        connect({ connector: injected });
       } else {
         console.warn("Wagmi connect or connectors not initialized yet.");
       }
@@ -145,7 +150,7 @@ const App: React.FC = () => {
             Export
           </button>
 
-          {/* Wallet Action Button - Always clickable, no disabled state */}
+          {/* Wallet Action Button */}
           <button 
             onClick={handleWalletAction}
             className="px-4 py-1.5 rounded-full border border-stone-200 text-xs text-stone-600 hover:bg-stone-50 transition-all font-medium"
