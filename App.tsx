@@ -12,16 +12,10 @@ const App: React.FC = () => {
   const [isReviewMode, setIsReviewMode] = useState(false);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
 
-  // Wagmi hooks with defensive defaults to prevent white screen on initialization lag
-  const account = useAccount() || {};
-  const connectResult = useConnect() || {};
-  const disconnectResult = useDisconnect() || {};
-
-  const isConnected = account?.isConnected ?? false;
-  const address = account?.address ?? null;
-  const connectors = connectResult?.connectors ?? [];
-  const connect = connectResult?.connect;
-  const disconnect = disconnectResult?.disconnect;
+  // Wagmi hooks
+  const { address, isConnected } = useAccount();
+  const { connectors, connect } = useConnect();
+  const { disconnect } = useDisconnect();
 
   // Persistence logic
   useEffect(() => {
@@ -44,31 +38,34 @@ const App: React.FC = () => {
     }
   }, [entries]);
 
-  const handleConnect = () => {
+  /**
+   * handleWalletAction strictly READS window.ethereum if available.
+   * It never modifies, defines, or polyfills the property.
+   */
+  const handleWalletAction = () => {
     console.log("connect clicked");
-    if (typeof window !== 'undefined' && (window as any).ethereum) {
-      if (connect && connectors && Array.isArray(connectors) && connectors.length > 0) {
-        // Find injected connector specifically
-        const injected = connectors.find(c => c && c.type === 'injected') || connectors[0];
+    
+    if (isConnected) {
+      if (disconnect) disconnect();
+      return;
+    }
+
+    // Passive check: only read window.ethereum
+    const ethereumProvider = typeof window !== 'undefined' ? (window as any).ethereum : undefined;
+
+    if (ethereumProvider) {
+      if (connect && connectors && connectors.length > 0) {
+        // Use the injected connector which interfaces with the existing window.ethereum
+        const injected = connectors.find(c => c.type === 'injected') || connectors[0];
         if (injected) {
           connect({ connector: injected });
         }
       } else {
-        console.warn("Wagmi connect or connectors not initialized yet.");
+        console.warn("Wagmi connect logic not ready.");
       }
     } else {
-      alert('Injected wallet (MetaMask/Rabby) not detected.');
-    }
-  };
-
-  const handleWalletAction = () => {
-    if (isConnected) {
-      console.log("disconnect clicked");
-      if (disconnect) {
-        disconnect();
-      }
-    } else {
-      handleConnect();
+      // Fail silently or notify user without touching window.ethereum
+      alert('Wallet extension (like MetaMask or Rabby) not found. No ethereum provider detected.');
     }
   };
 
@@ -152,7 +149,7 @@ const App: React.FC = () => {
             Export
           </button>
 
-          {/* Wallet Action Button */}
+          {/* Wallet Action Button - Always clickable per request */}
           <button 
             onClick={handleWalletAction}
             className="px-4 py-1.5 rounded-full border border-stone-200 text-xs text-stone-600 hover:bg-stone-50 transition-all font-medium"
