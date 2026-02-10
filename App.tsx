@@ -12,10 +12,10 @@ const App: React.FC = () => {
   const [isReviewMode, setIsReviewMode] = useState(false);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
 
-  // Wagmi hooks with defensive defaults
-  const account = useAccount();
-  const connectResult = useConnect();
-  const disconnectResult = useDisconnect();
+  // Wagmi hooks with defensive defaults to prevent white screen on initialization lag
+  const account = useAccount() || {};
+  const connectResult = useConnect() || {};
+  const disconnectResult = useDisconnect() || {};
 
   const isConnected = account?.isConnected ?? false;
   const address = account?.address ?? null;
@@ -39,7 +39,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (entries && entries.length > 0) {
+    if (entries && Array.isArray(entries) && entries.length > 0) {
       localStorage.setItem('decision_journal_entries', JSON.stringify(entries));
     }
   }, [entries]);
@@ -47,10 +47,12 @@ const App: React.FC = () => {
   const handleConnect = () => {
     console.log("connect clicked");
     if (typeof window !== 'undefined' && (window as any).ethereum) {
-      if (connect && connectors && connectors.length > 0) {
+      if (connect && connectors && Array.isArray(connectors) && connectors.length > 0) {
         // Find injected connector specifically
-        const injected = connectors.find(c => c.type === 'injected') || connectors[0];
-        connect({ connector: injected });
+        const injected = connectors.find(c => c && c.type === 'injected') || connectors[0];
+        if (injected) {
+          connect({ connector: injected });
+        }
       } else {
         console.warn("Wagmi connect or connectors not initialized yet.");
       }
@@ -102,7 +104,7 @@ const App: React.FC = () => {
       );
     }
 
-    if (!entries || entries.length === 0) {
+    if (!entries || !Array.isArray(entries) || entries.length === 0) {
       return <JournalForm onSave={addEntry} />;
     }
 
